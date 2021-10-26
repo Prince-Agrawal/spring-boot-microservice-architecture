@@ -35,12 +35,39 @@ public class MovieCatalogResource {
 
 
     @RequestMapping("/{userId}")
-    @HystrixCommand(fallbackMethod = "getFallbackCatalog")
     public List<CatalogItem> getCatalog(@PathVariable("userId") String userId){
-        UserRatingData userRatingData = restTemplate.getForObject("http://rating-data-service/ratingsdata/users/"+userId , UserRatingData.class);
+        UserRatingData userRatingData = getRatingsData(userId);
         return
         userRatingData.getUserRating().stream().map(rating -> {
-            Movie movie = restTemplate.getForObject("http://movie-info-service/movies/"+rating.getMovieId(), Movie.class);
+            Movie movie = getMovieData(rating);
+            return new CatalogItem(movie.getName(), movie.getDescription(), rating.getRating());
+        }).collect(Collectors.toList());
+    }
+
+    @HystrixCommand(fallbackMethod = "getFallbackRatingsData")
+    private UserRatingData getRatingsData(String userId){
+        return restTemplate.getForObject("http://rating-data-service/ratingsdata/users/"+userId , UserRatingData.class);
+    }
+
+    private UserRatingData getFallbackRatingsData(String userId){
+        return new UserRatingData(Arrays.asList(new Rating("0" , 0)));
+    }
+
+    @HystrixCommand(fallbackMethod = "getFallbackMoviesData")
+    private Movie getMovieData(Rating rating){
+        return restTemplate.getForObject("http://movie-info-service/movies/"+rating.getMovieId(), Movie.class);
+    }
+
+    private Movie getFallbackMoviesData(Rating rating){
+        return new Movie("0" , "No movie" , "No desc");
+    }
+
+    // fallback method
+    public List<CatalogItem> getFallbackCatalog(@PathVariable("userId") String userId){
+        return Arrays.asList(new CatalogItem("no movie", "no", 0));
+    }
+
+//web client
 
 //            Movie movie = webClientBuilder.build()
 //                    .get()
@@ -48,13 +75,4 @@ public class MovieCatalogResource {
 //                    .retrieve()
 //                    .bodyToMono(Movie.class)
 //                    .block();
-
-            return new CatalogItem(movie.getName(), movie.getDescription(), rating.getRating());
-        }).collect(Collectors.toList());
-    }
-
-    // fallback method
-    public List<CatalogItem> getFallbackCatalog(@PathVariable("userId") String userId){
-        return Arrays.asList(new CatalogItem("no movie", "no", 0));
-    }
 }
