@@ -1,5 +1,6 @@
 package io.javabrain.moviecatalogservice.resource;
 
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import io.javabrain.moviecatalogservice.model.CatalogItem;
 import io.javabrain.moviecatalogservice.model.Movie;
 import io.javabrain.moviecatalogservice.model.Rating;
@@ -34,6 +35,7 @@ public class MovieCatalogResource {
 
 
     @RequestMapping("/{userId}")
+    @HystrixCommand(fallbackMethod = "getFallbackCatalog")
     public List<CatalogItem> getCatalog(@PathVariable("userId") String userId){
         UserRatingData userRatingData = restTemplate.getForObject("http://rating-data-service/ratingsdata/users/"+userId , UserRatingData.class);
         return
@@ -49,5 +51,10 @@ public class MovieCatalogResource {
 
             return new CatalogItem(movie.getName(), movie.getDescription(), rating.getRating());
         }).collect(Collectors.toList());
+    }
+
+    // fallback method
+    public List<CatalogItem> getFallbackCatalog(@PathVariable("userId") String userId){
+        return Arrays.asList(new CatalogItem("no movie", "no", 0));
     }
 }
