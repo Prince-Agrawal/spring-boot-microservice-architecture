@@ -5,6 +5,8 @@ import io.javabrain.moviecatalogservice.model.CatalogItem;
 import io.javabrain.moviecatalogservice.model.Movie;
 import io.javabrain.moviecatalogservice.model.Rating;
 import io.javabrain.moviecatalogservice.model.UserRatingData;
+import io.javabrain.moviecatalogservice.service.MovieInfoService;
+import io.javabrain.moviecatalogservice.service.RatingsDataService;
 import org.apache.catalina.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +30,12 @@ public class MovieCatalogResource {
     @Autowired
     private WebClient.Builder webClientBuilder;
 
+    @Autowired
+    private MovieInfoService movieInfoService;
+
+    @Autowired
+    private RatingsDataService ratingsDataService;
+
     List<Rating> ratings = Arrays.asList(
             new Rating("123", 123),
             new Rating("456", 456)
@@ -36,35 +44,12 @@ public class MovieCatalogResource {
 
     @RequestMapping("/{userId}")
     public List<CatalogItem> getCatalog(@PathVariable("userId") String userId){
-        UserRatingData userRatingData = getRatingsData(userId);
+        UserRatingData userRatingData = ratingsDataService.getRatingsData(userId);
         return
         userRatingData.getUserRating().stream().map(rating -> {
-            Movie movie = getMovieData(rating);
+            Movie movie = movieInfoService.getMovieData(rating);
             return new CatalogItem(movie.getName(), movie.getDescription(), rating.getRating());
         }).collect(Collectors.toList());
-    }
-
-    @HystrixCommand(fallbackMethod = "getFallbackRatingsData")
-    private UserRatingData getRatingsData(String userId){
-        return restTemplate.getForObject("http://rating-data-service/ratingsdata/users/"+userId , UserRatingData.class);
-    }
-
-    private UserRatingData getFallbackRatingsData(String userId){
-        return new UserRatingData(Arrays.asList(new Rating("0" , 0)));
-    }
-
-    @HystrixCommand(fallbackMethod = "getFallbackMoviesData")
-    private Movie getMovieData(Rating rating){
-        return restTemplate.getForObject("http://movie-info-service/movies/"+rating.getMovieId(), Movie.class);
-    }
-
-    private Movie getFallbackMoviesData(Rating rating){
-        return new Movie("0" , "No movie" , "No desc");
-    }
-
-    // fallback method
-    public List<CatalogItem> getFallbackCatalog(@PathVariable("userId") String userId){
-        return Arrays.asList(new CatalogItem("no movie", "no", 0));
     }
 
 //web client
